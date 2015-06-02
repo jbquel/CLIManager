@@ -17,6 +17,8 @@ src: contains the sources
 
 demo: contains some c files coming from FreeRTOS+CLI demo that can be used as sample files to import 
 
+#### Run:
+python CLIManager.py
 
 
 #### First Use:
