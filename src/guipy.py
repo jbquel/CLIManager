@@ -200,6 +200,8 @@ class MainWindow(Gtk.Window):
     if self.CLIManager.ConManager.IsConnectionActive():
       self.fd = self.CLIManager.ConManager.Send(CmdStr)
 
+    self.CmdEntry.set_text("")	#Erase the content of the entry once the command is sent
+
 
   def AddConnectionsMenuActions(self, ActionGroup):
     ActionGroup.add_actions([
