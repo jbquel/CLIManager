@@ -3,7 +3,7 @@
 # Command line interface manager (CLIManager) for FreeRTOS+CLI
 # File: gui.py
 # This file defines the user interface and its behavior. The following code is
-# based on pyGTK3.
+# based on GTK3.
 #
 # This software is released under the MIT licence
 #
@@ -29,7 +29,7 @@
 ###############################################################################
 #!/usr/bin/python
 
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk, Pango
 from parser import *
 from CLIManager import * 
 
@@ -101,8 +101,6 @@ class MainWindow(Gtk.Window):
 
     #Liststore which contains the list of commands
     self.CommandsListstore = Gtk.ListStore(str, int, str, str)
-    #Liststore which contains the CLI
-    self.CLIListstore = Gtk.ListStore(str, str, str)
 
     ActionGroup = Gtk.ActionGroup("MenuActions")
     self.AddFileMenuActions(ActionGroup)
@@ -116,13 +114,8 @@ class MainWindow(Gtk.Window):
     self.Menubar = UIManager.get_widget("/MenuBar")
     self.Toolbar = UIManager.get_widget("/ToolBar")
 
+    # Status bar
     self.AppStatusbar = Statusbar(self)
-
-    #Create text entry
-    self.CmdEntry = Gtk.Entry()
-    self.CmdEntry.set_text("Command")
-    self.CmdEntry.set_icon_from_stock(Gtk.EntryIconPosition.PRIMARY, Gtk.STOCK_EXECUTE)
-    self.CmdEntry.connect("activate", self.SendCommand)
 
     #create the treeview for the set of commands
     self.CmdSetTreeview = Gtk.TreeView.new_with_model(self.CommandsListstore)
@@ -131,43 +124,43 @@ class MainWindow(Gtk.Window):
       column = Gtk.TreeViewColumn(Title, CmdSetRenderer, text=i)
       self.CmdSetTreeview.append_column(column)
 
-    #create the treeview for the CLI
-    self.CLITreeview = Gtk.TreeView.new_with_model(self.CLIListstore)
-    CLIRenderer = Gtk.CellRendererText()
-    CLIColumn = Gtk.TreeViewColumn("Interface", CLIRenderer, text=0, background=1, foreground=2)
-    self.CLITreeview.append_column(CLIColumn)
-
-    #Create send button
-    self.SendButton = Gtk.Button("Send")
-    self.SendButton.connect("clicked", self.SendCommand)
-
     #Scrolled windows
     self.CmdSetScrollWindow = Gtk.ScrolledWindow()
     self.CmdSetScrollWindow.set_vexpand(True)
     self.CLIScrollWindow = Gtk.ScrolledWindow()
     self.CLIScrollWindow.set_vexpand(True)
+    self.CLIScrollWindow.set_hexpand(True)
+
+    #Command Line Interface Textview
+    self.CLITextview = Gtk.TextView()
+    self.CLITextbuffer = self.CLITextview.get_buffer()
+    self.CLITextbuffer.set_text("> ")
+
+    self.CLIScrollWindow.add(self.CLITextview)
+    # Both views share the same keypree event handler
+    self.CLITextview.connect("key-press-event", self.KeyPressEnter)
+    self.CmdSetTreeview.connect("key-press-event", self.KeyPressEnter)
+
+    self.CLITextview.connect("button-press-event", self.OnButtonPressEvent)
+
+    self.CLITextbuffer.connect("insert-text", self.InsertTextCallback)
+    self.CLITextbuffer.connect("end-user-action", self.enduseraction)
+ 
+    # Create the mark that identifies the beginning of the 
+    self.CLITextbuffer.create_mark("CmdId", self.CLITextbuffer.get_end_iter(), True)
 
     #Layout of the main window
     self.grid.attach(self.Menubar, 0, 0, 8, 1)
     self.grid.attach(self.Toolbar, 0, 1, 8, 1)
     self.grid.attach(self.CLIScrollWindow, 0, 2, 8, 15)
-    self.grid.attach(self.CmdEntry, 0, 17, 7, 1)
-    self.grid.attach(self.SendButton, 7, 17, 1, 1)
-    self.grid.attach(self.CmdSetScrollWindow, 0, 18, 8, 15)
+    self.grid.attach(self.CmdSetScrollWindow, 0, 17, 8, 15)
     self.grid.attach(self.AppStatusbar, 0, 33, 8, 1)
 
     self.CmdSetScrollWindow.add(self.CmdSetTreeview)
-    self.CLIScrollWindow.add(self.CLITreeview)
 
     #The entry selected in the list is used to populate the command entry
     CommandSelected = self.CmdSetTreeview.get_selection()
     CommandSelected.connect("changed", self.OnCommandSelected)
-
-    #Allow completion of command from the command list
-    Completion = Gtk.EntryCompletion()
-    Completion.set_model(self.CommandsListstore)
-    self.CmdEntry.set_completion(Completion)
-    Completion.set_text_column(0)
 
     #Add the connection status to the main title of the window
     self.SetConnectionStatusInTitle()
@@ -177,30 +170,258 @@ class MainWindow(Gtk.Window):
 
     #Set colors for the CLI
     self.SetCLIColor(self.CLIManager.GetCLIColorConfig())
+
+    self.CLITextview.set_accepts_tab(True)
+    self.CLITextview.grab_focus()
+
+    CLIFont = Pango.FontDescription('Helvetica 14')
+    self.CLITextview.override_font(CLIFont)
+
+    self.AssistantPopoverActive = False
 	  
     self.show_all()
 
 
+  def OnButtonPressEvent(self,widget,event):
+    """ Set the focus on the CLI Textview when user click on it """
+    self.CLITextview.grab_focus()
+    return True	#Textview doesn't have to handle clicks
+
+
+  def KeyPressEnter(self, widget, event):
+    """ Handle key press events """
+
+    # Prevent the user from deleting or inserting before the prompt 
+    if event.keyval == Gdk.KEY_BackSpace or event.keyval == Gdk.KEY_Left:
+      CmdStartMark = self.CLITextbuffer.get_mark("CmdId")
+      CmdStartIter = self.CLITextbuffer.get_iter_at_mark(CmdStartMark)
+      LastIter = self.CLITextbuffer.get_iter_at_mark(self.CLITextbuffer.get_insert())
+      if LastIter.equal(CmdStartIter):
+	return True
+      else:
+	return False
+
+    # Keys reserved for history: to be omplemented
+    if (event.keyval == Gdk.KEY_Up or event.keyval == Gdk.KEY_Down) and widget.get_name() != "GtkTreeView":
+      return True
+
+    # Completion
+    if event.keyval == Gdk.KEY_Tab:
+      # Completion possible only if one suggested command
+      if self.IsAssistantPopoverActive() and self.IsOneSuggestion():
+	StartMark = self.CLITextbuffer.get_mark("CmdId")
+	Start = self.CLITextbuffer.get_iter_at_mark(StartMark)
+	End = self.CLITextbuffer.get_end_iter()
+
+	String = self.GetCompletionString(self.CLITextbuffer.get_text(Start, End, False))
+	self.CLITextbuffer.delete(Start, End)
+	self.CLITextbuffer.insert(Start, String)
+	self.UpdtateAssistantPopoverPointing()
+      return True # No tab displayed in the CLI
+
+    # User pressed enter in the the CLI
+    if event.keyval == Gdk.KEY_Return and widget.get_name() == "GtkTextView":
+      StartMark = self.CLITextbuffer.get_mark("CmdId")
+      start = self.CLITextbuffer.get_iter_at_mark(StartMark)
+      end = self.CLITextbuffer.get_end_iter()
+      Command = self.CLITextbuffer.get_text(start, end, False)
+
+      # New prompt for next line
+      self.CLITextbuffer.insert_at_cursor("\n> ",3)
+      # Popover (if displayed) should be removed
+      self.DestroyAssistantPopover()
+
+      if self.CLIManager.ConManager.IsConnectionActive():
+	self.fd = self.CLIManager.ConManager.Send(Command)
+
+      self.CLITextview.scroll_to_mark(self.CLITextbuffer.get_insert(),0.0,False,0.5,0.5)
+
+      # Create new mark at the beginning of the new command
+      self.CLITextbuffer.delete_mark_by_name("CmdId")
+      self.CLITextbuffer.create_mark("CmdId", self.CLITextbuffer.get_end_iter(), True) 
+
+      return True
+
+    # User pressed enter to select a command from the command treeview
+    if event.keyval == Gdk.KEY_Return and widget.get_name() == "GtkTreeView":
+      self.CLITextview.grab_focus() # Switch to the CLI to allow user
+      return True
+
+    return False
+
+
+  def GetCompletionString(self, pattern):
+    """ Returns the row starting with the requested pattern """
+    for Row in self.CommandsListstore:
+      if Row[0].startswith(pattern):
+	return Row[0]
+
+
+  def InsertTextCallback(self, widget, location, text, length):
+    """ Handle assistant popover according to user input """
+  
+    StartMark = self.CLITextbuffer.get_mark("CmdId")
+    start = self.CLITextbuffer.get_iter_at_mark(StartMark)
+    if length == 0:   # Case when backspace is pressed
+      End = self.CLITextbuffer.get_end_iter()
+      End.backward_char() #Last char is being suppressed
+    else:
+      End = self.CLITextbuffer.get_end_iter()
+        
+    UserInput = self.CLITextbuffer.get_text(start, End, False)
+
+    # When no input on the line no assistant popover should be displaayed
+    if UserInput + text == "":
+      self.DestroyAssistantPopover()
+      return
+
+    AssistantPopoverContent = ""
+    ShowPopover = False
+
+    Line = UserInput + text	# group the whole input
+    CurrentLine =  Line.split() # split to get the command without parameters
+
+    for Row in self.CommandsListstore:
+      if Row[0].startswith(CurrentLine[0]):
+	ShowPopover = True
+	# Exact match no need to show assistant anymore
+	if Row[0] == CurrentLine[0] and Row[1] == 0:
+	  ShowPopover = False
+
+	# Command input complete but the popover will display the parameters
+	elif Row[0] == CurrentLine[0] and Row[1] != 0:
+	  # Parse the Help string to extract parameters if possible
+	  Parser = CmdParser()
+	  ParamList = Parser.ParseHelpString(Row[2], Row[1])
+	  
+	  if ParamList != None:
+	    if len(ParamList) != 0:
+	      for Param in ParamList:
+		print str(Param)
+		if AssistantPopoverContent != "":
+		  AssistantPopoverContent += " "
+		AssistantPopoverContent += "<b><i>[ " + Param + " ]</i></b>"
+	    else:
+	    # Special case. No argument found in the help string but
+	    # the nb of declared arguments is not 0
+	      AssistantPopoverContent += "<b><i>[ ... ]</i></b>"
+    
+	# The command name is not complete yet
+	else:
+	  # Parse the help string to extract command parameters if possible
+	  Parser = CmdParser()
+	  ParamList = Parser.ParseHelpString(Row[2], Row[1])
+
+	  if AssistantPopoverContent != "":
+	    AssistantPopoverContent += "\n"
+	  AssistantPopoverContent += '<b>' + Row[0] + "</b>"
+	  if ParamList != None:
+	    if len(ParamList) != 0:
+	      for Param in ParamList:
+		AssistantPopoverContent += " " + "<i>[ " + Param + " ]</i>"
+	    else:
+		AssistantPopoverContent += " " + "<i>[ ... ]</i>"
+		
+    if ShowPopover == True:
+      if self.AssistantPopoverActive == True:
+	# Just update the popover
+	self.UpdtateAssistantPopover(AssistantPopoverContent)
+      else:
+	# Create and display the popover
+	self.DisplayAssistantPopover(AssistantPopoverContent)
+    else:
+      	self.DestroyAssistantPopover()
+
+
+  def enduseraction(self, buffer):
+    """ Ensure the the pointing tip of the popover is aligned with the last iter """
+
+    if self.AssistantPopoverActive == True:
+      self.UpdtateAssistantPopoverPointing()
+      #self.Popover.grab_focus()
+
+
   def OnCommandSelected(self, Selection):
     """ Called when an entry is selected in the list of commands """
+
     Model, TreeIter = Selection.get_selected()
     if TreeIter != None:
-      self.CmdEntry.set_text(Model[TreeIter][0])
+      CmdStartMark = self.CLITextbuffer.get_mark("CmdId")
+      Start = self.CLITextbuffer.get_iter_at_mark(CmdStartMark)
+      end = self.CLITextbuffer.get_end_iter()
+      self.CLITextbuffer.delete(Start, end) # replace what was typed by the command
+      self.CLITextbuffer.insert(Start, Model[TreeIter][0])
+
+      self.UpdtateAssistantPopoverPointing()
 
 
-  def SendCommand(self, entry):
-    """ Called when 'Enter' is pressed or send button activated """
-    CmdStr = self.CmdEntry.get_text()
-    #Add the command to the view
-    ListIter = self.CLIListstore.append((CmdStr, self.CLIColorBackground , self.CLIColorForegroundTx ))
-    #Follow the last line in the view
-    Path = self.CLIListstore.get_path(ListIter)
-    self.CLITreeview.scroll_to_cell(self.CLIListstore.get_path(ListIter))
-    #Send the command
-    if self.CLIManager.ConManager.IsConnectionActive():
-      self.fd = self.CLIManager.ConManager.Send(CmdStr)
+  def DisplayAssistantPopover(self, text):
+    """ Create and show the assistant popover """
+    self.Popover = Gtk.Popover.new(self.CLITextview)
+    self.PopoverLabel = Gtk.Label()
+    self.PopoverLabel.set_markup(text)
+    self.Popover.add(self.PopoverLabel)
 
-    self.CmdEntry.set_text("")	#Erase the content of the entry once the command is sent
+    Pos = self.CLITextbuffer.get_end_iter()
+    Location = self.CLITextview.get_iter_location(Pos)
+    WinLocation = Location
+    WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
+
+    self.Popover.set_pointing_to(WinLocation)
+    self.Popover.set_modal(False)   # The popover doesn't ttake user interaction
+    self.Popover.set_position(Gtk.PositionType.BOTTOM)
+
+    self.Popover.show_all()
+
+    self.AssistantPopoverActive = True;
+
+
+  def DestroyAssistantPopover(self):
+    """ Destroy th assistant pover and reset the associated flag """
+    if self.AssistantPopoverActive == True:
+      self.Popover.destroy()
+    self.AssistantPopoverActive = False
+
+
+  def UpdtateAssistantPopover(self, text):
+    """ Update the popover content and pointing tip position """ 
+    self.PopoverLabel.set_markup(text)
+    Pos = self.CLITextbuffer.get_end_iter()
+    Location = self.CLITextview.get_iter_location(Pos)
+    # convert the buffer coords to window coords so the popover is always visible
+    # even when the window is scrolled
+    WinLocation = Location
+    WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
+    # Update pointing tip
+    self.Popover.set_pointing_to(WinLocation)
+
+
+  def UpdtateAssistantPopoverPointing(self):
+    """ Update the place where the assistant popover is pointing """
+    if self.AssistantPopoverActive == True:
+      Pos = self.CLITextbuffer.get_end_iter()
+      Location = self.CLITextview.get_iter_location(Pos)
+      # convert the buffer coords to window coords so the popover is always visible
+      # even when the window is scrolled
+      WinLocation = Location
+      WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
+
+      self.Popover.set_pointing_to(WinLocation)
+
+
+  def IsAssistantPopoverActive(self):
+    """ Tells if the assistant popover is currently displayed """
+    return self.AssistantPopoverActive
+
+
+  def IsOneSuggestion(self):
+    """ Tells if there is only one command corresponding to what is typed """
+    text = self.PopoverLabel.get_text()
+    # Check if there's more than one line in the label
+    if "\n" in text:
+      return False
+    else:
+      return True
 
 
   def AddConnectionsMenuActions(self, ActionGroup):
@@ -271,21 +492,27 @@ class MainWindow(Gtk.Window):
     self.SetCLIColor(widget.get_name())
 
 
+  def ParseColor(self, color):
+    """ Parse colors to set Bg and Fg colors according to selected color scheme """
+    _color = Gdk.RGBA()
+    _color.parse(color)
+    return _color
+
+
   def SetCLIColor(self, ColorStyle):
     """ Called when the CLI color must be changed """
 
     if ColorStyle == "ColorNone":
-      self.CLIColorBackground = "white"
-      self.CLIColorForegroundTx = "Black"
-      self.CLIColorForegroundRx = "Black"
+      self.CLITextview.override_background_color(Gtk.StateFlags.NORMAL, self.ParseColor("white"))
+      self.CLITextview.override_color(Gtk.StateFlags.NORMAL, self.ParseColor("black"))
+
     elif ColorStyle == "ColorSea":
-      self.CLIColorBackground = "#123A4A"
-      self.CLIColorForegroundTx = "turquoise2"
-      self.CLIColorForegroundRx = "aquamarine3"
+      self.CLITextview.override_background_color(Gtk.StateFlags.NORMAL, self.ParseColor("#123A4A"))
+      self.CLITextview.override_color(Gtk.StateFlags.NORMAL, self.ParseColor("turquoise2"))
+
     elif ColorStyle == "ColorConsole":
-      self.CLIColorBackground = "black"
-      self.CLIColorForegroundRx = "White"
-      self.CLIColorForegroundTx = "White"
+      self.CLITextview.override_background_color(Gtk.StateFlags.NORMAL, self.ParseColor("black"))
+      self.CLITextview.override_color(Gtk.StateFlags.NORMAL, self.ParseColor("white"))
 
 
   def OnOptionEscapeCharToggled(self, widget):
@@ -305,7 +532,14 @@ class MainWindow(Gtk.Window):
 
   def OnMenuClear(self, widget):
     """ Called when the clear button from the toolbar is pressed """	
-    self.CLIListstore.clear()
+    # Empty the whole textview
+    Start, End = self.CLITextbuffer.get_bounds()
+    self.CLITextbuffer.delete(Start, End)
+    self.CLITextbuffer.insert_at_cursor("> ",2)
+
+    # Update the mark
+    self.CLITextbuffer.delete_mark_by_name("CmdId")
+    self.CLITextbuffer.create_mark("CmdId", self.CLITextbuffer.get_end_iter(), True) 
 	
 
   def OnMenuConnectionTypeChanged(self, widget, current):
@@ -318,10 +552,19 @@ class MainWindow(Gtk.Window):
 
   def DataHandler(self, data):
     """ Callback to handle data received from the socket """
-    ListIter = self.CLIListstore.append(( data, self.CLIColorBackground , self.CLIColorForegroundRx ))
-    #Scroll to the last entry
-    path = self.CLIListstore.get_path(ListIter)
-    self.CLITreeview.scroll_to_cell(self.CLIListstore.get_path(ListIter))
+
+    CmdStartMark = self.CLITextbuffer.get_mark("CmdId")
+    Start = self.CLITextbuffer.get_iter_at_mark(CmdStartMark)
+    end = self.CLITextbuffer.get_end_iter()
+    self.CLITextbuffer.delete(Start, end)
+    self.CLITextbuffer.insert(Start, data)
+    self.CLITextbuffer.insert_at_cursor("\n> ",3)
+
+    # Update the mark
+    self.CLITextbuffer.delete_mark_by_name("CmdId")
+    self.CLITextbuffer.create_mark("CmdId", self.CLITextbuffer.get_end_iter(), True) 
+
+    self.CLITextview.scroll_to_mark(self.CLITextbuffer.get_insert(),0.0,True,0.5,0.5)
 
 
   def OnMenuConnect(self, widget):
@@ -685,7 +928,4 @@ class Statusbar(Gtk.Statusbar):
     Msg = "Close connection"
     self.push(self.ContextId, Msg)
     
-
-
-
 

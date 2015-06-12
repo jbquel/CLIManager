@@ -101,4 +101,29 @@ class CmdParser:
 				  ""))
 
 
+  def ParseHelpString(self, string, nbargs):
+    """ Parse the help string to find command's arguments """
+
+    if nbargs == 0:
+      return None #No assistance can be provided to populate arguments
+
+    # Define Grammar
+    Wrd = Word(alphas,alphanums+'_')
+    StringArg = QuotedString("<",endQuoteChar=">")
+    BoolArg = QuotedString("[",endQuoteChar="]")
+
+    _HelpString = Group(  ZeroOrMore(Wrd) + Optional(StringArg('StringParam')) + \
+					    Optional(BoolArg('BoolParam')))
+
+    HelpString = _HelpString('Str')
+
+    Arglist = []
+    for item,start,stop in HelpString.scanString(string):
+      if item.Str.StringParam != "":
+	Arglist.append(item.Str.StringParam)
+      if item.Str.BoolParam != "":
+	Arglist.append(item.Str.BoolParam)
+
+    return Arglist
+
 
