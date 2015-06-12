@@ -145,6 +145,7 @@ class MainWindow(Gtk.Window):
 
     self.CLITextbuffer.connect("insert-text", self.InsertTextCallback)
     self.CLITextbuffer.connect("end-user-action", self.enduseraction)
+    self.connect('check-resize', self.OnWindowResized)
  
     # Create the mark that identifies the beginning of the 
     self.CLITextbuffer.create_mark("CmdId", self.CLITextbuffer.get_end_iter(), True)
@@ -186,6 +187,11 @@ class MainWindow(Gtk.Window):
     """ Set the focus on the CLI Textview when user click on it """
     self.CLITextview.grab_focus()
     return True	#Textview doesn't have to handle clicks
+
+
+  def OnWindowResized(self, window):
+    """ Ensure that the popover is always aligned with the text """
+    self.UpdtateAssistantPopoverPointing()
 
 
   def KeyPressEnter(self, widget, event):
