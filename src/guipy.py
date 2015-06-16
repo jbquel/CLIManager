@@ -232,9 +232,10 @@ class MainWindow(Gtk.Window):
 	End = self.CLITextbuffer.get_end_iter()
 
 	String = self.GetCompletionString(self.CLITextbuffer.get_text(Start, End, False))
-	self.CLITextbuffer.delete(Start, End)
-	self.CLITextbuffer.insert(Start, String)
-	self.UpdtateAssistantPopover("")
+	if String is not None:	# No completion if nothing matches
+	  self.CLITextbuffer.delete(Start, End)
+	  self.CLITextbuffer.insert(Start, String)
+	  self.UpdtateAssistantPopover("")
       return True # No tab displayed in the CLI
 
     # User pressed enter in the the CLI
