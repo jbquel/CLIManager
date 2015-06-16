@@ -254,6 +254,7 @@ class CLIManager:
     self.ConManager = ConnectionManagement()
     self.CommandsSetLoaded = False  #No set loaded
     self.HideEscapeChars = False    #Option not enabled at startup
+    self.HideSyntaxAssistant = False #Assistant popover show/hide
     self.CLIColor = self.GetCLIColorFromFile()	#Get color scheme from config file
 
 
@@ -313,10 +314,12 @@ class CLIManager:
 
 
   def GetHideEscapeParam(self):
-    return self.HideEscapeChars;  #Tells the GUI if the option is enabled
+    """ Tells the GUI if the option is enabled """
+    return self.HideEscapeChars
 
 
   def SetHideEscapeParam(self, value):
+    """ Set the option state """
     self.HideEscapeChars = value
 
 
@@ -327,6 +330,15 @@ class CLIManager:
       row[3] = row[2].replace("\\n", "")
       row[3] = row[3].replace("\\r", "")
 
+
+  def GetHideSyntaxAssistantParam(self):
+    """ Tells the GUI if the option is enabled """
+    return self.HideSyntaxAssistant
+
+
+  def SetHideSyntaxAssistantParam(self, value):
+    """ Set the option state """
+    self.HideSyntaxAssistant = value
 
 
 if __name__ == "__main__":

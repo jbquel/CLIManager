@@ -62,6 +62,8 @@ UI_MENU = """
 	<menuitem action='ColorSea' />
 	<menuitem action='ColorConsole' />
       </menu>
+      <separator/>
+      <menuitem action='HideAssistantPopover' />
       <menuitem action='HideEscapeChar' />
     </menu>
   </menubar>
@@ -376,23 +378,25 @@ class MainWindow(Gtk.Window):
 
   def DisplayAssistantPopover(self, text):
     """ Create and show the assistant popover """
-    self.Popover = Gtk.Popover.new(self.CLITextview)
-    self.PopoverLabel = Gtk.Label()
-    self.PopoverLabel.set_markup(text)
-    self.Popover.add(self.PopoverLabel)
 
-    Pos = self.CLITextbuffer.get_end_iter()
-    Location = self.CLITextview.get_iter_location(Pos)
-    WinLocation = Location
-    WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
+    if self.CLIManager.GetHideSyntaxAssistantParam() is False:
+      self.Popover = Gtk.Popover.new(self.CLITextview)
+      self.PopoverLabel = Gtk.Label()
+      self.PopoverLabel.set_markup(text)
+      self.Popover.add(self.PopoverLabel)
 
-    self.Popover.set_pointing_to(WinLocation)
-    self.Popover.set_modal(False)   # The popover doesn't take user interaction
-    self.Popover.set_position(Gtk.PositionType.BOTTOM)
+      Pos = self.CLITextbuffer.get_end_iter()
+      Location = self.CLITextview.get_iter_location(Pos)
+      WinLocation = Location
+      WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
 
-    self.Popover.show_all()
+      self.Popover.set_pointing_to(WinLocation)
+      self.Popover.set_modal(False)   # The popover doesn't take user interaction
+      self.Popover.set_position(Gtk.PositionType.BOTTOM)
 
-    self.AssistantPopoverActive = True;
+      self.Popover.show_all()
+
+      self.AssistantPopoverActive = True;
 
 
   def DestroyAssistantPopover(self):
@@ -403,20 +407,22 @@ class MainWindow(Gtk.Window):
 
 
   def UpdtateAssistantPopover(self, text):
-    """ Update the popover content and pointing tip position """ 
-    self.PopoverLabel.set_markup(text)
-    Pos = self.CLITextbuffer.get_end_iter()
-    Location = self.CLITextview.get_iter_location(Pos)
-    # convert the buffer coords to window coords so the popover is always visible
-    # even when the window is scrolled
-    WinLocation = Location
-    WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
-    # Update pointing tip
-    self.Popover.set_pointing_to(WinLocation)
+    """ Update the popover content and pointing tip position """
+    if self.AssistantPopoverActive == True:
+      self.PopoverLabel.set_markup(text)
+      Pos = self.CLITextbuffer.get_end_iter()
+      Location = self.CLITextview.get_iter_location(Pos)
+      # convert the buffer coords to window coords so the popover is always visible
+      # even when the window is scrolled
+      WinLocation = Location
+      WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
+      # Update pointing tip
+      self.Popover.set_pointing_to(WinLocation)
 
 
   def UpdtateAssistantPopoverPointing(self):
     """ Update the place where the assistant popover is pointing """
+
     if self.AssistantPopoverActive == True:
       Pos = self.CLITextbuffer.get_end_iter()
       Location = self.CLITextview.get_iter_location(Pos)
@@ -540,6 +546,11 @@ class MainWindow(Gtk.Window):
     EscapeChar.connect("toggled", self.OnOptionEscapeCharToggled)
     ActionGroup.add_action(EscapeChar)
 
+    SyntaxAssistant = Gtk.ToggleAction("HideAssistantPopover", "Hide syntax assistant", \
+				      None, None)
+    SyntaxAssistant.connect("toggled", self.OnOptionSyntaxAssistantToggled)
+    ActionGroup.add_action(SyntaxAssistant)
+
     ActionGroup.add_actions([
             ("ColorNone", None, "None", None, None, self.OnOptionSelectColor),
             ("ColorSea", None, "Sea", None, None, self.OnOptionSelectColor),
@@ -593,6 +604,15 @@ class MainWindow(Gtk.Window):
       #The column with escape chars (2) is set to visible whereas the other is not
       self.CmdSetTreeview.get_column(2).set_visible(True)
       self.CmdSetTreeview.get_column(3).set_visible(False)
+
+
+  def OnOptionSyntaxAssistantToggled(self,widget):
+    """ Called when the syntax assistant popover option state is changed """
+    if widget.get_active():
+      self.CLIManager.SetHideSyntaxAssistantParam(True)
+      self.DestroyAssistantPopover()  # Option disabled so the popover should be destroyed immediately
+    else:
+      self.CLIManager.SetHideSyntaxAssistantParam(False)
 
 
   def OnMenuClear(self, widget):
