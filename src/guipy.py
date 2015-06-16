@@ -197,7 +197,7 @@ class MainWindow(Gtk.Window):
 
   def OnWindowResized(self, window):
     """ Ensure that the popover is always aligned with the text """
-    self.UpdtateAssistantPopoverPointing()
+    self.UpdtateAssistantPopover("")
 
 
   def KeyPressEnter(self, widget, event):
@@ -234,7 +234,7 @@ class MainWindow(Gtk.Window):
 	String = self.GetCompletionString(self.CLITextbuffer.get_text(Start, End, False))
 	self.CLITextbuffer.delete(Start, End)
 	self.CLITextbuffer.insert(Start, String)
-	self.UpdtateAssistantPopoverPointing()
+	self.UpdtateAssistantPopover("")
       return True # No tab displayed in the CLI
 
     # User pressed enter in the the CLI
@@ -359,7 +359,7 @@ class MainWindow(Gtk.Window):
 
     # Always keep the alignement with the last iter
     if self.AssistantPopoverActive == True:
-      self.UpdtateAssistantPopoverPointing()
+      self.UpdtateAssistantPopover("")
 
     # If line is empty, the assistant popover should disappear
     StartMark = self.CLITextbuffer.get_mark("CmdId")
@@ -380,7 +380,7 @@ class MainWindow(Gtk.Window):
       self.CLITextbuffer.delete(Start, end) # replace what was typed by the command
       self.CLITextbuffer.insert(Start, Model[TreeIter][0])
 
-      self.UpdtateAssistantPopoverPointing()
+      self.UpdtateAssistantPopover("")
 
 
   def DisplayAssistantPopover(self, text):
@@ -416,28 +416,16 @@ class MainWindow(Gtk.Window):
   def UpdtateAssistantPopover(self, text):
     """ Update the popover content and pointing tip position """
     if self.AssistantPopoverActive == True:
-      self.PopoverLabel.set_markup(text)
+      if text != "":  # Label not updated when empty string
+	self.PopoverLabel.set_markup(text)
+
       Pos = self.CLITextbuffer.get_end_iter()
       Location = self.CLITextview.get_iter_location(Pos)
       # convert the buffer coords to window coords so the popover is always visible
       # even when the window is scrolled
       WinLocation = Location
       WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
-      # Update pointing tip
-      self.Popover.set_pointing_to(WinLocation)
-
-
-  def UpdtateAssistantPopoverPointing(self):
-    """ Update the place where the assistant popover is pointing """
-
-    if self.AssistantPopoverActive == True:
-      Pos = self.CLITextbuffer.get_end_iter()
-      Location = self.CLITextview.get_iter_location(Pos)
-      # convert the buffer coords to window coords so the popover is always visible
-      # even when the window is scrolled
-      WinLocation = Location
-      WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
-
+      # Update pointing tip position
       self.Popover.set_pointing_to(WinLocation)
 
 
@@ -475,7 +463,7 @@ class MainWindow(Gtk.Window):
       self.CLITextbuffer.delete(Start, end) # what was typed will be replaced by history entry
       self.CLITextbuffer.insert(Start, self.CLIHistory[(self.CLIHistoryOffset)])  # Insert entry
 
-      self.UpdtateAssistantPopoverPointing()  # Update assistant popover if dsplayed
+      self.UpdtateAssistantPopover("")  # Update assistant popover if displayed
 
 
   def HistoryStepForward(self):
@@ -499,7 +487,7 @@ class MainWindow(Gtk.Window):
     if Entry == "":
       self.DestroyAssistantPopover()  # Destroy popover if any
     else:
-      self.UpdtateAssistantPopoverPointing()  # Update Popover
+      self.UpdtateAssistantPopover("")  # Update Popover
 
 
   def AddConnectionsMenuActions(self, ActionGroup):
