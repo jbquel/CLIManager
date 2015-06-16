@@ -146,7 +146,7 @@ class MainWindow(Gtk.Window):
     self.CLITextview.connect("button-press-event", self.OnButtonPressEvent)
 
     self.CLITextbuffer.connect("insert-text", self.InsertTextCallback)
-    self.CLITextbuffer.connect("end-user-action", self.enduseraction)
+    self.CLITextbuffer.connect("end-user-action", self.EnduserAction)
     self.connect('check-resize', self.OnWindowResized)
  
     # Create the mark that identifies the beginning of the 
@@ -354,12 +354,19 @@ class MainWindow(Gtk.Window):
       	self.DestroyAssistantPopover()
 
 
-  def enduseraction(self, buffer):
-    """ Ensure the the pointing tip of the popover is aligned with the last iter """
+  def EnduserAction(self, buffer):
+    """ Ensure popover pointing tip correct alignment and popover position after user input """
 
+    # Always keep the alignement with the last iter
     if self.AssistantPopoverActive == True:
       self.UpdtateAssistantPopoverPointing()
-      #self.Popover.grab_focus()
+
+    # If line is empty, the assistant popover should disappear
+    StartMark = self.CLITextbuffer.get_mark("CmdId")
+    Start = self.CLITextbuffer.get_iter_at_mark(StartMark)
+    End = self.CLITextbuffer.get_end_iter()
+    if self.CLITextbuffer.get_text(Start, End, False) == "":
+      self.DestroyAssistantPopover()
 
 
   def OnCommandSelected(self, Selection):
