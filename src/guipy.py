@@ -179,6 +179,10 @@ class MainWindow(Gtk.Window):
     self.CLITextview.override_font(CLIFont)
 
     self.AssistantPopoverActive = False
+
+    # Init variables for command history
+    self.CLIHistory = []
+    self.CLIHistoryOffset = 0
 	  
     self.show_all()
 
@@ -207,9 +211,15 @@ class MainWindow(Gtk.Window):
       else:
 	return False
 
-    # Keys reserved for history: to be omplemented
-    if (event.keyval == Gdk.KEY_Up or event.keyval == Gdk.KEY_Down) and widget.get_name() != "GtkTreeView":
+    # Keys related to command history
+    if (event.keyval == Gdk.KEY_Up and widget.get_name() == "GtkTextView"):
+      self.HistoryStepBackward()
       return True
+
+    if (event.keyval == Gdk.KEY_Down and widget.get_name() == "GtkTextView"):
+      self.HistoryStepForward()
+      return True
+
 
     # Completion
     if event.keyval == Gdk.KEY_Tab:
@@ -244,7 +254,10 @@ class MainWindow(Gtk.Window):
 
       # Create new mark at the beginning of the new command
       self.CLITextbuffer.delete_mark_by_name("CmdId")
-      self.CLITextbuffer.create_mark("CmdId", self.CLITextbuffer.get_end_iter(), True) 
+      self.CLITextbuffer.create_mark("CmdId", self.CLITextbuffer.get_end_iter(), True)
+
+      # Add command to history
+      self.AddToHistory(Command)
 
       return True
 
@@ -374,7 +387,7 @@ class MainWindow(Gtk.Window):
     WinLocation.x, WinLocation.y = self.CLITextview.buffer_to_window_coords(Gtk.TextWindowType.TEXT,Location.x,Location.y)
 
     self.Popover.set_pointing_to(WinLocation)
-    self.Popover.set_modal(False)   # The popover doesn't ttake user interaction
+    self.Popover.set_modal(False)   # The popover doesn't take user interaction
     self.Popover.set_position(Gtk.PositionType.BOTTOM)
 
     self.Popover.show_all()
@@ -428,6 +441,52 @@ class MainWindow(Gtk.Window):
       return False
     else:
       return True
+
+
+  def AddToHistory(self, command):
+    """ Add a command to history. Called after the user sent a command """
+
+    if command != "": # Do not insert blank lines
+      self.CLIHistory.append(command)
+      self.CLIHistoryOffset = len(self.CLIHistory)  # Update offset value
+
+
+  def HistoryStepBackward(self):
+    """ Make a step backward in the history and display the entry """
+
+    if self.CLIHistoryOffset > 0:
+      self.CLIHistoryOffset -= 1
+      CmdStartMark = self.CLITextbuffer.get_mark("CmdId")
+      Start = self.CLITextbuffer.get_iter_at_mark(CmdStartMark)
+      end = self.CLITextbuffer.get_end_iter()
+      self.CLITextbuffer.delete(Start, end) # what was typed will be replaced by history entry
+      self.CLITextbuffer.insert(Start, self.CLIHistory[(self.CLIHistoryOffset)])  # Insert entry
+
+      self.UpdtateAssistantPopoverPointing()  # Update assistant popover if dsplayed
+
+
+  def HistoryStepForward(self):
+    """ Make a step forward in the history and display the entry """
+
+    if self.CLIHistoryOffset <= (len(self.CLIHistory) - 1):
+      self.CLIHistoryOffset += 1
+      if self.CLIHistoryOffset == len(self.CLIHistory): # Offset incremented just before
+	Entry = ""  # Not an entry in the history
+      else:
+	Entry = self.CLIHistory[self.CLIHistoryOffset]
+    else:   # Do not increment offset
+      Entry = ""
+
+    CmdStartMark = self.CLITextbuffer.get_mark("CmdId")
+    Start = self.CLITextbuffer.get_iter_at_mark(CmdStartMark)
+    end = self.CLITextbuffer.get_end_iter()
+    self.CLITextbuffer.delete(Start, end) # replace what was typed by the command
+    self.CLITextbuffer.insert(Start, Entry)
+
+    if Entry == "":
+      self.DestroyAssistantPopover()  # Destroy popover if any
+    else:
+      self.UpdtateAssistantPopoverPointing()  # Update Popover
 
 
   def AddConnectionsMenuActions(self, ActionGroup):
