@@ -50,29 +50,29 @@ class CmdParser:
     comment.ignore(cStyleComment)
 
     Declaration = Group( _def + identifier + EQ + LEFT_BRACE + \
-			      CmdString('CmdString').setParseAction(removeQuotes)  + \
+			      CmdString('NameString').setParseAction(removeQuotes)  + \
 			      COMMA + \
 			      Optional(comment) + \
-			      CmdHelp('CmdHelp').setParseAction(removeQuotes)  + \
+			      CmdHelp('Help').setParseAction(removeQuotes)  + \
 			      COMMA + \
 			      identifier + \
 			      COMMA + \
 			      Optional(comment) + \
-			      signed_int('CmdArgs').setParseAction( lambda s,l,t: [ int(t[0]) ] ) + \
+			      signed_int('Args').setParseAction( lambda s,l,t: [ int(t[0]) ] ) + \
 			      Optional(comment) + \
 			      RIGHT_BRACE )
 
-    self.CommandDefinition = Declaration('CmdDeclaration')
+    self.CommandDefinition = Declaration('Command')
     self.CommandDefinition.ignore(cStyleComment)
 
     #define grammar for parsing the set of commands (.set file)
-    line = Group( CmdString('CmdString').setParseAction(removeQuotes) + \
+    line = Group( CmdString('NameString').setParseAction(removeQuotes) + \
 			  COMMA + \
-			  CmdHelp('CmdHelp').setParseAction(removeQuotes) + \
+			  CmdHelp('Help').setParseAction(removeQuotes) + \
 			  COMMA + \
-			  signed_int('CmdArgs').setParseAction( lambda s,l,t: [ int(t[0]) ] ))
+			  signed_int('Args').setParseAction( lambda s,l,t: [ int(t[0]) ] ))
     
-    self.Command = line('line')
+    self.Command = line('Command')
 
 
   def CmdParse(self, filename, source, liststore):
@@ -84,21 +84,28 @@ class CmdParser:
 
     FileContent = "".join(FileLines)
 
-    #a source file (.c) has to be parsed
+    # Set the string to parse
     if source == 'Source':
-    	for item,start,stop in self.CommandDefinition.scanString(FileContent):
-		liststore.append((item.CmdDeclaration.CmdString, \
-				  item.CmdDeclaration.CmdArgs, \
-				  item.CmdDeclaration.CmdHelp, \
-				  ""))
+      ScannedString = self.CommandDefinition.scanString(FileContent)
+    elif source == 'List':
+      ScannedString = self.Command.scanString(FileContent)
 
-    #a commands set file (.set) has to be parsed
-    elif source == 'Set':
-    	for item,start,stop in self.Command.scanString(FileContent):
-		liststore.append((item.line.CmdString, \
-				  item.line.CmdArgs, \
-				  item.line.CmdHelp, \
-				  ""))
+    for item,start,stop in ScannedString:
+      if len(liststore) != 0:
+	Duplicate = False # (Re)Init duplicate flag
+	for Row in liststore:
+	  if Row[0] == item.Command.NameString:
+	    Duplicate = True
+	if Duplicate is False:	# Added to the list only if not a duplicate
+	  liststore.append((item.Command.NameString, \
+			    item.Command.Args, \
+			    item.Command.Help, \
+			    ""))
+      else: # No command in the list yet
+	liststore.append((item.Command.NameString, \
+			  item.Command.Args, \
+			  item.Command.Help, \
+			  ""))
 
 
   def ParseHelpString(self, string, nbargs):

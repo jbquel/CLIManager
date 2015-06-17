@@ -677,85 +677,76 @@ class MainWindow(Gtk.Window):
 
   def OnMenuImportFromSet(self, widget):
     """ Called when the user request to open a file """
-    Dialog = Gtk.FileChooserDialog("Select commands set file (.set)", self,
-             Gtk.FileChooserAction.OPEN,
-            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-             Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
-
-    FilterSet = Gtk.FileFilter()
-    FilterSet.set_name(".set")
-    FilterSet.add_pattern("*.set")
-    Dialog.add_filter(FilterSet)
-
-    FilterAll = Gtk.FileFilter()
-    FilterAll.set_name("All")
-    FilterAll.add_pattern("*")
-    Dialog.add_filter(FilterAll)
-
-    Response = Dialog.run()
-
-    if Response == Gtk.ResponseType.OK:
-      Filename = Dialog.get_filename()
-      if not Filename.endswith ('.set'):
-	Filename += '.set'
-
-      #Check if a set is already loaded
-      if self.CLIManager.IsCommandsSetLoaded():
-	#liststore should be emptied first
-	self.CommandsListstore.clear()
-	self.CLIManager.SetCommandsSetLoaded(False)
-
-      #parse the file and load the commands set
-      Parser = CmdParser()
-      Parser.CmdParse(Filename, 'Set', self.CommandsListstore)
-
-      self.CLIManager.SetHideEscapeCharColumn(self.CommandsListstore)
-      self.CLIManager.SetCommandsSetLoaded(True)
-
-      self.AppStatusbar.FileLoaded(Filename)
-
-    Dialog.destroy()
+    self.ImportFrom('List')
 
 
   def OnMenuImportFromSource(self, widget):
     """ Called when the user request to import a file from sources """
-    Dialog = Gtk.FileChooserDialog("Select source file", self,
+    self.ImportFrom('Source')
+
+
+  def ImportFrom(self, FileType):
+    """ Called when a list of commands should be loaded to the gtk liststore """
+
+    if FileType == 'Source':
+      DialogTitle = "Select source file"
+      # Filters for the file chooser
+      FilterMain = Gtk.FileFilter()
+      FilterMain.set_name("C files")
+      FilterMain.add_pattern("*.c")
+
+      FilterAll = Gtk.FileFilter()
+      FilterAll.set_name("All")
+      FilterAll.add_pattern("*")
+
+    elif FileType == 'List':
+      DialogTitle = "Select list of commands file (.set)"
+      # Filters for the file chooser
+      FilterMain = Gtk.FileFilter()
+      FilterMain.set_name(".set")
+      FilterMain.add_pattern("*.set")
+
+      FilterAll = Gtk.FileFilter()
+      FilterAll.set_name("All")
+      FilterAll.add_pattern("*")
+
+    Dialog = Gtk.FileChooserDialog(DialogTitle, self,
              Gtk.FileChooserAction.OPEN,
             (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
              Gtk.STOCK_OPEN, Gtk.ResponseType.OK))
 
-    FilterC = Gtk.FileFilter()
-    FilterC.set_name("C files")
-    FilterC.add_pattern("*.c")
-    Dialog.add_filter(FilterC)
-
-    FilterAll = Gtk.FileFilter()
-    FilterAll.set_name("All")
-    FilterAll.add_pattern("*")
+    Dialog.add_filter(FilterMain)
     Dialog.add_filter(FilterAll)
 
     Response = Dialog.run()
+    Filename = Dialog.get_filename() # Filename is nonetype when cancel button pressed
+    Dialog.destroy()  # Dialog not needed anymore
+
     if Response == Gtk.ResponseType.OK:
-      Filename = Dialog.get_filename()
-      if not Filename.endswith ('.c'):
-	Filename += '.c'
 
       #Check if a set is already loaded
       if self.CLIManager.IsCommandsSetLoaded():
-	#liststore should be emptied first
-	self.CommandsListstore.clear()
-	self.CLIManager.SetCommandsSetLoaded(False)
+	AddToListDialog = AppendToListDialog(self)
+	AddToListDialog.show()
+	AppendResponse = AddToListDialog.run()
+	AddToListDialog.destroy() # Dialog not needed anymore
 
-      #parse the file and load the generated set
+	if AppendResponse == Gtk.ResponseType.CANCEL:
+	  return # Import cancelled
+
+	if AppendResponse == Gtk.ResponseType.NO:
+	  #liststore should be emptied first
+	  self.CommandsListstore.clear()
+	  self.CLIManager.SetCommandsSetLoaded(False)
+
+      #parse the file and load the generated list
       Parser = CmdParser()
-      Parser.CmdParse(Filename, 'Source', self.CommandsListstore)
+      Parser.CmdParse(Filename, FileType, self.CommandsListstore)
 
       self.CLIManager.SetHideEscapeCharColumn(self.CommandsListstore)
 
       self.CLIManager.SetCommandsSetLoaded(True)
       self.AppStatusbar.FileImported(Filename)
-      
-    Dialog.destroy()
 
 
   def OnMenuSaveAs(self,widget):
@@ -932,20 +923,27 @@ class ConnectionsDialog(Gtk.Dialog):
 							   self.TCPPortEntry.get_text())
 
 
-class SaveDialog(Gtk.Dialog):
-  """ Dialog for saving the imported commands """    
+class AppendToListDialog(Gtk.Dialog):
+  """ Dialog for offering to append the commands to the current list if one are already loaded """    
 
   def __init__(self, parent):
-    Gtk.Dialog.__init__(self, "Save", parent, 0,
-		       (Gtk.STOCK_NO, Gtk.ResponseType.NO,
-			Gtk.STOCK_YES, Gtk.ResponseType.YES))
+    Gtk.Dialog.__init__(self, "Append to current list?", parent, 0,
+		       (Gtk.STOCK_YES, Gtk.ResponseType.YES,
+			Gtk.STOCK_NO, Gtk.ResponseType.NO,
+			Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL))
 
-    self.set_default_size(150, 100)
+    self.set_default_size(350, 130)
 
-    Label = Gtk.Label("\nWould you like to save the converted file?")
+    LabelMain = Gtk.Label()
+    LabelMain.set_markup("\n\n<b>A list of commands is already loaded</b>")
+
+    LabelLine2 = Gtk.Label("\nWould you like to add the new commands to the current list?")
+    LabelLine3 = Gtk.Label("(Duplicates will be automatically removed)")
 
     Box = self.get_content_area()
-    Box.add(Label)
+    Box.add(LabelMain)
+    Box.add(LabelLine2)
+    Box.add(LabelLine3)
     self.show_all()
 
 
@@ -983,7 +981,7 @@ class Statusbar(Gtk.Statusbar):
   def FileImported(self, filename):
     """ Set the message in the status bar once the file is imported """
     self.Pop()
-    Msg = "CLI imported from: " + os.path.basename(filename)
+    Msg = "List imported from: " + os.path.basename(filename)
     self.push(self.ContextId, Msg)
 
 
