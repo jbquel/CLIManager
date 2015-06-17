@@ -62,6 +62,7 @@ UI_MENU = """
 	<menuitem action='ColorSea' />
 	<menuitem action='ColorConsole' />
       </menu>
+      <menuitem action='CLIFontSelection' />
       <separator/>
       <menuitem action='HideAssistantPopover' />
       <menuitem action='HideEscapeChar' />
@@ -174,11 +175,13 @@ class MainWindow(Gtk.Window):
     #Set colors for the CLI
     self.SetCLIColor(self.CLIManager.GetCLIColorConfig())
 
+    # Set font for the CLI
+    self.CLIFont = Pango.FontDescription(self.CLIManager.GetCLIFontConfig())
+    self.CLITextview.override_font(self.CLIFont)
+
+
     self.CLITextview.set_accepts_tab(True)
     self.CLITextview.grab_focus()
-
-    CLIFont = Pango.FontDescription('Helvetica 14')
-    self.CLITextview.override_font(CLIFont)
 
     self.AssistantPopoverActive = False
 
@@ -535,7 +538,9 @@ class MainWindow(Gtk.Window):
   def AddOptionsMenuActions(self, ActionGroup):
     ActionGroup.add_actions([
             ("OptionsMenu", None, "Options"),
-            ("CLIColor", None, "CLI color") ])
+            ("CLIColor", None, "CLI color"),
+	    ("CLIFontSelection", None, "CLI font", None, None, self.OnOptionSelectFont) ])
+
 
     EscapeChar = Gtk.ToggleAction("HideEscapeChar", "Hide escape sequences", \
 				      None, None)
@@ -562,6 +567,23 @@ class MainWindow(Gtk.Window):
     """ Called when the user select a color scheme for the CLI """
     self.CLIManager.SetCLIColorConfig(widget.get_name())
     self.SetCLIColor(widget.get_name())
+
+
+  def OnOptionSelectFont(self,widget):
+    """ Called when the user select a font for the CLI """
+    FontDialog = Gtk.FontChooserDialog("CLI font", self)
+    FontDialog.set_font_desc(self.CLIFont)
+    FontDialog.show()
+    Response = FontDialog.run()
+
+    if Response == Gtk.ResponseType.OK:
+      self.CLIFont = FontDialog.get_font_desc()
+      FontName = FontDialog.get_font()
+      self.CLIManager.SetCLIFontConfig(FontName)  # Save as user preference
+
+      self.CLITextview.override_font(self.CLIFont)  # Update CLI font
+
+    FontDialog.destroy()
 
 
   def ParseColor(self, color):

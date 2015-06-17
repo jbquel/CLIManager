@@ -45,6 +45,7 @@ DefaultIP = "127.0.0.1"		  #Default IP address
 DefaultPort = "5005"		  #Default port
 DefaultType = "UDP"		  #Default protocol for the connection
 DefaultColor = "ColorNone"	  #Default color scheme for the CLI
+DefaultFont = "Helvetica 14"	  #Default font for the CLI
 
 
 class ConnectionManagement:
@@ -123,7 +124,7 @@ class ConnectionManagement:
 
 
   def CreateDefaultConfigFile(self):
-    #Create the default config file
+    """ Create the default config file """
     with open(CONFIG_FILENAME, 'w') as ConfigFile:
       ConfigFile.write("#Connections\n")
       ConfigFile.write("<UDP:" + DefaultIP + ":" + DefaultPort + "\n" )
@@ -131,6 +132,7 @@ class ConnectionManagement:
       ConfigFile.write("<Type:" +  DefaultType + "\n")
       ConfigFile.write("#Options\n")
       ConfigFile.write("<Color:" +  DefaultColor + "\n")
+      ConfigFile.write("<Font:" + DefaultFont + "\n")
 
     ConfigFile.close()
 
@@ -256,6 +258,7 @@ class CLIManager:
     self.HideEscapeChars = False    #Option not enabled at startup
     self.HideSyntaxAssistant = False #Assistant popover show/hide
     self.CLIColor = self.GetCLIColorFromFile()	#Get color scheme from config file
+    self.CLIFont = self.GetCLIFontFromFile()  #Get font from the config file
 
 
   def IsCommandsSetLoaded(self):
@@ -276,7 +279,7 @@ class CLIManager:
       
 
   def GetCLIColorFromFile(self):
-
+    """ Get the prefered color scheme for the CLI from the config file """
     Pattern = re.compile("<Color:(.+)$")
 
     with open(CONFIG_FILENAME, 'r') as ConfigFile:
@@ -291,10 +294,12 @@ class CLIManager:
 
 
   def GetCLIColorConfig(self):
-    return self.CLIColor  #Tells the GUI the color scheme to use
+    """ Tells the GUI which coor scheme to use """
+    return self.CLIColor
 
 
   def SetCLIColorConfig(self, value):
+    """ Set the prefered color scheme for the CLI """
     self.CLIColor = value
 
     Pattern = re.compile("<Color:(.+)$")
@@ -303,6 +308,45 @@ class CLIManager:
 
     for line in fileinput.input(CONFIG_FILENAME, inplace=1):
       line = Pattern.sub(Color, line)
+
+      if '\n' in line:
+	line = line.replace("\n", "")
+	print line
+      else:
+	print line
+
+    fileinput.close()
+
+  def GetCLIFontFromFile(self):
+    """ Get the prefered font from the config file """
+    CLIFont = DefaultFont
+    Pattern = re.compile("<Font:(.+)$")
+
+    with open(CONFIG_FILENAME, 'r') as ConfigFile:
+      for line in ConfigFile:
+	match = re.search(Pattern,line)
+	if match:
+	  CLIFont =  match.group(1)
+
+      ConfigFile.close()
+    
+    return CLIFont
+
+
+  def GetCLIFontConfig(self):
+    """ Tells the GUI which font to use for the CLI """
+    return self.CLIFont
+
+
+  def SetCLIFontConfig(self, font):
+    """ Set the prefered font for the CLI """
+    self.CLIFont = font
+    Pattern = re.compile("<Font:(.+)$")
+
+    Font = "<Font:" + font
+
+    for line in fileinput.input(CONFIG_FILENAME, inplace=1):
+      line = Pattern.sub(Font, line)
 
       if '\n' in line:
 	line = line.replace("\n", "")
@@ -324,8 +368,7 @@ class CLIManager:
 
 
   def SetHideEscapeCharColumn(self, liststore):
-    #Remove the escape characters \r and \n from the help string and copy it
-    #in the 3rd column
+    """ Remove the escape characters \r and \n from the help string and copy it in the 3rd column """
     for row in liststore:
       row[3] = row[2].replace("\\n", "")
       row[3] = row[3].replace("\\r", "")
