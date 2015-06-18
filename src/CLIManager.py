@@ -46,6 +46,8 @@ DefaultPort = "5005"		  #Default port
 DefaultType = "UDP"		  #Default protocol for the connection
 DefaultColor = "ColorNone"	  #Default color scheme for the CLI
 DefaultFont = "Helvetica 14"	  #Default font for the CLI
+DefaultSyntaxAssistant = "False"    #Default setting for the syntax assistant option
+DefaultEscapeChars = "False"	    #Default setting for the hide escape char option
 
 
 class ConnectionManagement:
@@ -133,6 +135,9 @@ class ConnectionManagement:
       ConfigFile.write("#Options\n")
       ConfigFile.write("<Color:" +  DefaultColor + "\n")
       ConfigFile.write("<Font:" + DefaultFont + "\n")
+      ConfigFile.write("#Preferences\n")
+      ConfigFile.write("<SyntaxAssistant:" +  DefaultSyntaxAssistant + "\n")
+      ConfigFile.write("<EscapeChars:" + DefaultEscapeChars + "\n")
 
     ConfigFile.close()
 
@@ -255,8 +260,8 @@ class CLIManager:
     #Create an instance of the connection manager
     self.ConManager = ConnectionManagement()
     self.CommandsSetLoaded = False  #No set loaded
-    self.HideEscapeChars = False    #Option not enabled at startup
-    self.HideSyntaxAssistant = False #Assistant popover show/hide
+    self.HideEscapeChars = self.GetHideEscapeParamFromFile()    #Get preference
+    self.HideSyntaxAssistant = self.GetHideSyntaxAssistantParamFromFile() #Get preference
     self.CLIColor = self.GetCLIColorFromFile()	#Get color scheme from config file
     self.CLIFont = self.GetCLIFontFromFile()  #Get font from the config file
 
@@ -357,6 +362,25 @@ class CLIManager:
     fileinput.close()
 
 
+  def GetHideEscapeParamFromFile(self):
+    """ Get the Hide escape chars option preference from the config file """
+    Param = DefaultEscapeChars
+    Pattern = re.compile("<EscapeChars:(.+)$")
+
+    with open(CONFIG_FILENAME, 'r') as ConfigFile:
+      for line in ConfigFile:
+	match = re.search(Pattern,line)
+	if match:
+	  Param =  match.group(1)
+
+      ConfigFile.close()
+
+    if Param == "True":
+      return True
+    else:
+      return False
+
+
   def GetHideEscapeParam(self):
     """ Tells the GUI if the option is enabled """
     return self.HideEscapeChars
@@ -366,12 +390,46 @@ class CLIManager:
     """ Set the option state """
     self.HideEscapeChars = value
 
+    Pattern = re.compile("<EscapeChars:(.+)$")
+
+    Param = "<EscapeChars:" + str(value)
+
+    for line in fileinput.input(CONFIG_FILENAME, inplace=1):
+      line = Pattern.sub(Param, line)
+
+      if '\n' in line:
+	line = line.replace("\n", "")
+	print line
+      else:
+	print line
+
+    fileinput.close()
+
 
   def SetHideEscapeCharColumn(self, liststore):
     """ Remove the escape characters \r and \n from the help string and copy it in the 3rd column """
     for row in liststore:
       row[3] = row[2].replace("\\n", "")
       row[3] = row[3].replace("\\r", "")
+
+
+  def GetHideSyntaxAssistantParamFromFile(self):
+    """ Get the Hide syntax assistant option preference from the config file """
+    Param = DefaultSyntaxAssistant
+    Pattern = re.compile("<SyntaxAssistant:(.+)$")
+
+    with open(CONFIG_FILENAME, 'r') as ConfigFile:
+      for line in ConfigFile:
+	match = re.search(Pattern,line)
+	if match:
+	  Param =  match.group(1)
+
+      ConfigFile.close()
+    
+    if Param == "True":
+      return True
+    else:
+      return False
 
 
   def GetHideSyntaxAssistantParam(self):
@@ -382,6 +440,22 @@ class CLIManager:
   def SetHideSyntaxAssistantParam(self, value):
     """ Set the option state """
     self.HideSyntaxAssistant = value
+
+    Pattern = re.compile("<SyntaxAssistant:(.+)$")
+
+    Param = "<SyntaxAssistant:" + str(value)
+
+    for line in fileinput.input(CONFIG_FILENAME, inplace=1):
+      line = Pattern.sub(Param, line)
+
+      if '\n' in line:
+	line = line.replace("\n", "")
+	print line
+      else:
+	print line
+
+    fileinput.close()
+
 
 
 if __name__ == "__main__":

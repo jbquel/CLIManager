@@ -545,11 +545,13 @@ class MainWindow(Gtk.Window):
     EscapeChar = Gtk.ToggleAction("HideEscapeChar", "Hide escape sequences", \
 				      None, None)
     EscapeChar.connect("toggled", self.OnOptionEscapeCharToggled)
+    EscapeChar.set_active(self.CLIManager.GetHideEscapeParam())
     ActionGroup.add_action(EscapeChar)
 
     SyntaxAssistant = Gtk.ToggleAction("HideAssistantPopover", "Hide syntax assistant", \
 				      None, None)
     SyntaxAssistant.connect("toggled", self.OnOptionSyntaxAssistantToggled)
+    SyntaxAssistant.set_active(self.CLIManager.GetHideSyntaxAssistantParam())
     ActionGroup.add_action(SyntaxAssistant)
 
     ActionGroup.add_actions([
@@ -614,11 +616,19 @@ class MainWindow(Gtk.Window):
 
     if widget.get_active():
       self.CLIManager.SetHideEscapeParam(True)
+      self.SetVisibleColumn(True)
+    else:
+      self.CLIManager.SetHideEscapeParam(False)
+      self.SetVisibleColumn(False)
+
+
+  def SetVisibleColumn(self, Param):
+    """ Set the visible help column according to the option state """
+    if Param is True:
       #The column without escape chars (3) is set to visible whereas the other is not
       self.CmdSetTreeview.get_column(2).set_visible(False)
       self.CmdSetTreeview.get_column(3).set_visible(True)
     else:
-      self.CLIManager.SetHideEscapeParam(False)
       #The column with escape chars (2) is set to visible whereas the other is not
       self.CmdSetTreeview.get_column(2).set_visible(True)
       self.CmdSetTreeview.get_column(3).set_visible(False)
@@ -766,6 +776,7 @@ class MainWindow(Gtk.Window):
       Parser.CmdParse(Filename, FileType, self.CommandsListstore)
 
       self.CLIManager.SetHideEscapeCharColumn(self.CommandsListstore)
+      self.SetVisibleColumn(self.CLIManager.GetHideEscapeParam())
 
       self.CLIManager.SetCommandsSetLoaded(True)
       self.AppStatusbar.FileImported(Filename)
