@@ -260,10 +260,11 @@ class CLIManager:
     #Create an instance of the connection manager
     self.ConManager = ConnectionManagement()
     self.CommandsSetLoaded = False  #No set loaded
-    self.HideEscapeChars = self.GetHideEscapeParamFromFile()    #Get preference
-    self.HideSyntaxAssistant = self.GetHideSyntaxAssistantParamFromFile() #Get preference
-    self.CLIColor = self.GetCLIColorFromFile()	#Get color scheme from config file
-    self.CLIFont = self.GetCLIFontFromFile()  #Get font from the config file
+    self.HideEscapeChars = DefaultEscapeChars
+    self.HideSyntaxAssistant = DefaultSyntaxAssistant
+    self.CLIColor = DefaultColor
+    self.CLIFont = DefaultFont
+    self.GetPreferencesFromConfigFile()	# Load user preferences from config file
 
 
   def IsCommandsSetLoaded(self):
@@ -281,21 +282,40 @@ class CLIManager:
       for row in liststore:
 	cfile.write('"' + row[0] + '","' + row[2] + '",' + str(row[1]) + '\n')
     cfile.close()
-      
 
-  def GetCLIColorFromFile(self):
-    """ Get the prefered color scheme for the CLI from the config file """
-    Pattern = re.compile("<Color:(.+)$")
+
+  def GetPreferencesFromConfigFile(self):
+    """ Retrieve parameters and preferences from the configuration file """
+
+    # Define regex for pattern matching in the config file
+    CLIColorPattern = re.compile("<Color:(.+)$")
+    CLIFontPattern = re.compile("<Font:(.+)$")
+    EscapeCharsPattern = re.compile("<EscapeChars:(.+)$")
+    SyntaxAssistantPattern = re.compile("<SyntaxAssistant:(.+)$")
 
     with open(CONFIG_FILENAME, 'r') as ConfigFile:
       for line in ConfigFile:
-	match = re.search(Pattern,line)
-	if match:
-	  CLIColor =  match.group(1)
+	CLIColorMatch = re.search(CLIColorPattern,line)
+	CLIFontMatch = re.search(CLIFontPattern,line)
+	EscapeCharsMatch = re.search(EscapeCharsPattern,line)
+	SyntaxAssistantMatch = re.search(SyntaxAssistantPattern,line)
+
+	if CLIColorMatch:
+	  self.CLIColor = CLIColorMatch.group(1)
+	elif CLIFontMatch:
+	  self.CLIFont = CLIFontMatch.group(1)
+	elif EscapeCharsMatch:
+	  if EscapeCharsMatch.group(1) == 'True':
+	    self.HideEscapeChars = True
+	  else:
+	    self.HideEscapeChars = False
+	elif SyntaxAssistantMatch:
+	  if SyntaxAssistantMatch.group(1) == 'True':
+	    self.HideSyntaxAssistant = True
+	  else:
+	    self.HideSyntaxAssistant = False
 
       ConfigFile.close()
-
-    return CLIColor
 
 
   def GetCLIColorConfig(self):
@@ -322,21 +342,6 @@ class CLIManager:
 
     fileinput.close()
 
-  def GetCLIFontFromFile(self):
-    """ Get the prefered font from the config file """
-    CLIFont = DefaultFont
-    Pattern = re.compile("<Font:(.+)$")
-
-    with open(CONFIG_FILENAME, 'r') as ConfigFile:
-      for line in ConfigFile:
-	match = re.search(Pattern,line)
-	if match:
-	  CLIFont =  match.group(1)
-
-      ConfigFile.close()
-    
-    return CLIFont
-
 
   def GetCLIFontConfig(self):
     """ Tells the GUI which font to use for the CLI """
@@ -360,25 +365,6 @@ class CLIManager:
 	print line
 
     fileinput.close()
-
-
-  def GetHideEscapeParamFromFile(self):
-    """ Get the Hide escape chars option preference from the config file """
-    Param = DefaultEscapeChars
-    Pattern = re.compile("<EscapeChars:(.+)$")
-
-    with open(CONFIG_FILENAME, 'r') as ConfigFile:
-      for line in ConfigFile:
-	match = re.search(Pattern,line)
-	if match:
-	  Param =  match.group(1)
-
-      ConfigFile.close()
-
-    if Param == "True":
-      return True
-    else:
-      return False
 
 
   def GetHideEscapeParam(self):
@@ -411,25 +397,6 @@ class CLIManager:
     for row in liststore:
       row[3] = row[2].replace("\\n", "")
       row[3] = row[3].replace("\\r", "")
-
-
-  def GetHideSyntaxAssistantParamFromFile(self):
-    """ Get the Hide syntax assistant option preference from the config file """
-    Param = DefaultSyntaxAssistant
-    Pattern = re.compile("<SyntaxAssistant:(.+)$")
-
-    with open(CONFIG_FILENAME, 'r') as ConfigFile:
-      for line in ConfigFile:
-	match = re.search(Pattern,line)
-	if match:
-	  Param =  match.group(1)
-
-      ConfigFile.close()
-    
-    if Param == "True":
-      return True
-    else:
-      return False
 
 
   def GetHideSyntaxAssistantParam(self):
