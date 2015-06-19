@@ -105,6 +105,15 @@ class MainWindow(Gtk.Window):
     #Liststore which contains the list of commands
     self.CommandsListstore = Gtk.ListStore(str, int, str, str)
 
+    #create the treeview for the set of commands
+    self.CmdSetTreeview = Gtk.TreeView.new_with_model(self.CommandsListstore)
+    for i, Title in enumerate(["Command", " Nb Arguments", "Help string", "Help string"]):
+      CmdSetRenderer = Gtk.CellRendererText()
+      column = Gtk.TreeViewColumn(Title, CmdSetRenderer, text=i)
+      self.CmdSetTreeview.append_column(column)
+
+    self.AssistantPopoverActive = False
+
     ActionGroup = Gtk.ActionGroup("MenuActions")
     self.AddFileMenuActions(ActionGroup)
     self.AddConnectionsMenuActions(ActionGroup)
@@ -119,13 +128,6 @@ class MainWindow(Gtk.Window):
 
     # Status bar
     self.AppStatusbar = Statusbar(self)
-
-    #create the treeview for the set of commands
-    self.CmdSetTreeview = Gtk.TreeView.new_with_model(self.CommandsListstore)
-    for i, Title in enumerate(["Command", " Nb Arguments", "Help string", "Help string"]):
-      CmdSetRenderer = Gtk.CellRendererText()
-      column = Gtk.TreeViewColumn(Title, CmdSetRenderer, text=i)
-      self.CmdSetTreeview.append_column(column)
 
     #Scrolled windows
     self.CmdSetScrollWindow = Gtk.ScrolledWindow()
@@ -179,11 +181,8 @@ class MainWindow(Gtk.Window):
     self.CLIFont = Pango.FontDescription(self.CLIManager.GetCLIFontConfig())
     self.CLITextview.override_font(self.CLIFont)
 
-
     self.CLITextview.set_accepts_tab(True)
     self.CLITextview.grab_focus()
-
-    self.AssistantPopoverActive = False
 
     # Init variables for command history
     self.CLIHistory = []
