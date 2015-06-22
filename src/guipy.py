@@ -149,6 +149,7 @@ class MainWindow(Gtk.Window):
     self.CLITextview.connect("button-press-event", self.OnButtonPressEvent)
 
     self.CLITextbuffer.connect("insert-text", self.InsertTextCallback)
+    self.CLITextbuffer.connect("delete-range", self.DeleteTextCallback)
     self.CLITextbuffer.connect("end-user-action", self.EnduserAction)
     self.connect('check-resize', self.OnWindowResized)
  
@@ -282,38 +283,53 @@ class MainWindow(Gtk.Window):
 
 
   def InsertTextCallback(self, widget, location, text, length):
-    """ Handle assistant popover according to user input """
+    """ Handle syntax assistant popover according to user input """
   
     StartMark = self.CLITextbuffer.get_mark("CmdId")
-    start = self.CLITextbuffer.get_iter_at_mark(StartMark)
-    if length == 0:   # Case when backspace is pressed
-      End = self.CLITextbuffer.get_end_iter()
-      End.backward_char() #Last char is being suppressed
-    else:
-      End = self.CLITextbuffer.get_end_iter()
+    Start = self.CLITextbuffer.get_iter_at_mark(StartMark)
+    End = self.CLITextbuffer.get_end_iter()
         
-    UserInput = self.CLITextbuffer.get_text(start, End, False)
-
-    # When no input on the line no assistant popover should be displaayed
-    if UserInput + text == "":
-      self.DestroyAssistantPopover()
-      return
-
-    AssistantPopoverContent = ""
-    ShowPopover = False
+    UserInput = self.CLITextbuffer.get_text(Start, End, False)
 
     Line = UserInput + text	# group the whole input
     CurrentLine =  Line.split() # split to get the command without parameters
 
+    self.FillSyntaxAssistantContent(CurrentLine)
+
+
+  def DeleteTextCallback(self, buffer, start, end):
+    """ Handle syntax assistant popover when some text is deleted """
+    StartMark = self.CLITextbuffer.get_mark("CmdId")
+    Start = self.CLITextbuffer.get_iter_at_mark(StartMark)
+    End = self.CLITextbuffer.get_end_iter()
+    End.backward_char() #Last char is being suppressed
+
+    UserInput = self.CLITextbuffer.get_text(Start, End, False)
+
+    # When no input on the line no assistant popover should be displaayed
+    if UserInput == "":
+      self.DestroyAssistantPopover()
+      return
+
+    CurrentLine =  UserInput.split() # split to get the command without parameters
+
+    self.FillSyntaxAssistantContent(CurrentLine)
+
+
+  def FillSyntaxAssistantContent(self, Line):
+    """ Fills the syntax assistant popover with suggestions according to user input """
+    AssistantPopoverContent = ""
+    ShowPopover = False
+
     for Row in self.CommandsListstore:
-      if Row[0].startswith(CurrentLine[0]):
+      if Row[0].startswith(Line[0]):
 	ShowPopover = True
 	# Exact match no need to show assistant anymore
-	if Row[0] == CurrentLine[0] and Row[1] == 0:
+	if Row[0] == Line[0] and Row[1] == 0:
 	  ShowPopover = False
 
 	# Command input complete but the popover will display the parameters
-	elif Row[0] == CurrentLine[0] and Row[1] != 0:
+	elif Row[0] == Line[0] and Row[1] != 0:
 	  # Parse the Help string to extract parameters if possible
 	  Parser = CmdParser()
 	  ParamList = Parser.ParseHelpString(Row[2], Row[1])
@@ -321,7 +337,6 @@ class MainWindow(Gtk.Window):
 	  if ParamList != None:
 	    if len(ParamList) != 0:
 	      for Param in ParamList:
-		print str(Param)
 		if AssistantPopoverContent != "":
 		  AssistantPopoverContent += " "
 		AssistantPopoverContent += "<b><i>[ " + Param + " ]</i></b>"
