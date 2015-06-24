@@ -292,9 +292,8 @@ class MainWindow(Gtk.Window):
     UserInput = self.CLITextbuffer.get_text(Start, End, False)
 
     Line = UserInput + text	# group the whole input
-    CurrentLine =  Line.split() # split to get the command without parameters
 
-    self.FillSyntaxAssistantContent(CurrentLine)
+    self.FillSyntaxAssistantContent(Line)
 
 
   def DeleteTextCallback(self, buffer, start, end):
@@ -306,14 +305,12 @@ class MainWindow(Gtk.Window):
 
     UserInput = self.CLITextbuffer.get_text(Start, End, False)
 
-    # When no input on the line no assistant popover should be displaayed
+    # When no input on the line no assistant popover should be displayed
     if UserInput == "":
       self.DestroyAssistantPopover()
       return
 
-    CurrentLine =  UserInput.split() # split to get the command without parameters
-
-    self.FillSyntaxAssistantContent(CurrentLine)
+    self.FillSyntaxAssistantContent(UserInput)
 
 
   def FillSyntaxAssistantContent(self, Line):
@@ -321,15 +318,17 @@ class MainWindow(Gtk.Window):
     AssistantPopoverContent = ""
     ShowPopover = False
 
+    CurrentLine = Line.split() # Split to get the command without parameter
+
     for Row in self.CommandsListstore:
-      if Row[0].startswith(Line[0]):
+      if Row[0].startswith(CurrentLine[0]):
 	ShowPopover = True
 	# Exact match no need to show assistant anymore
-	if Row[0] == Line[0] and Row[1] == 0:
+	if Row[0] == CurrentLine[0] and Row[1] == 0:
 	  ShowPopover = False
 
 	# Command input complete but the popover will display the parameters
-	elif Row[0] == Line[0] and Row[1] != 0:
+	elif Row[0] == CurrentLine[0] and Row[1] != 0:
 	  # Parse the Help string to extract parameters if possible
 	  Parser = CmdParser()
 	  ParamList = Parser.ParseHelpString(Row[2], Row[1])
@@ -344,6 +343,10 @@ class MainWindow(Gtk.Window):
 	    # Special case. No argument found in the help string but
 	    # the nb of declared arguments is not 0
 	      AssistantPopoverContent += "<b><i>[ ... ]</i></b>"
+
+	# Handle whitespaces in the command string
+	elif (Row[0] != CurrentLine[0]) and (" " in Line):
+	    ShowPopover = False
     
 	# The command name is not complete yet
 	else:
